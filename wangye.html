@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雷霆战机 - 过关版</title>
+
+    <!-- 引入 Google 字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@500&display=swap" rel="stylesheet">
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Roboto', sans-serif; /* 使用 Google 字体 */
+        }
+
+        canvas {
+            display: block; /* 让 canvas 元素没有滚动条 */
+        }
+
+        /* 优化得分显示 */
+        .score-board {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5); /* 半透明黑色背景 */
+            color: white;
+            font-size: 24px;
+            border-radius: 5px; /* 圆角背景 */
+        }
+
+        /* 为重新开始按钮设置样式 */
+        .restart-button, .continue-button, .confirm-button {
+            display: none; /* 初始隐藏 */
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px;
+            background-color: #ff4081; /* 粉色按钮背景 */
+            color: white;
+            font-size: 18px;
+            border: none;
+            border-radius: 25px; /* 圆角按钮 */
+            cursor: pointer;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3); /* 添加阴影效果 */
+            transition: background-color 0.3s ease; /* 添加过渡效果 */
+        }
+
+        /* 按钮悬停时的效果 */
+        .restart-button:hover, .continue-button:hover, .confirm-button:hover {
+            background-color: #e91e63; /* 深色背景 */
+        }
+
+        /* 背景样式 */
+        .game-overlay, .win-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8); /* 半透明黑色背景 */
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            display: none; /* 初始隐藏 */
+        }
+
+        /* 提示语样式 */
+        .game-over-text, .win-text {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        /* 菜字样式 */
+        .chicken-text {
+            font-size: 100px; /* 字体大小 */
+            color: red; /* 字体颜色 */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* 居中显示 */
+            z-index: -1; /* 背景显示 */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas> <!-- 游戏画布 -->
+
+    <!-- 得分板 -->
+    <div class="score-board" id="scoreBoard">得分: 0/20</div>
+
+    <!-- 游戏结束提示 -->
+    <div class="game-overlay" id="gameOverlay">
+        <div class="game-over-text">游戏结束</div>
+        <div class="chicken-text">菜</div> <!-- 新增的大大的“菜”字 -->
+        <button class="restart-button" id="restartButton">重新开始游戏</button> <!-- 重新开始按钮 -->
+    </div>
+
+    <!-- 过关提示 -->
+    <div class="win-overlay" id="winOverlay">
+        <div class="win-text">恭喜过关，您可领取奖励</div>
+        <button class="continue-button" id="continueButton">好的</button>
+        <button class="confirm-button" id="confirmButton">确定</button>
+    </div>
+
+    <!-- 音频文件 -->
+    <audio id="backgroundMusic" src="background.mp3" loop autoplay></audio> <!-- 背景音乐 -->
+    <audio id="shootSound" src="shoot.mp3"></audio> <!-- 射击音效 -->
+    <audio id="explosionSound" src="explosion.mp3"></audio> <!-- 爆炸音效 -->
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let score = 0; // 初始化分数
+        const maxScore = 20; // 过关的最大分数
+        let gameRunning = true; // 游戏状态
+        let enemySpeed = 2; // 敌机速度
+        let enemySpawnInterval = 1000; // 敌机生成间隔
+
+        // 引入 UI 元素
+        const scoreBoard = document.getElementById('scoreBoard');
+        const gameOverlay = document.getElementById('gameOverlay');
+        const winOverlay = document.getElementById('winOverlay');
+        const restartButton = document.getElementById('restartButton');
+        const continueButton = document.getElementById('continueButton');
+        const confirmButton = document.getElementById('confirmButton');
+
+        // 添加图片资源
+        const backgroundImage = new Image();
+        backgroundImage.src = 'background.jpg';
+        const planeImage = new Image();
+        planeImage.src = 'plane.png';
+        const enemyImage = new Image();
+        enemyImage.src = 'enemy.png';
+        const bulletImage = new Image();
+        bulletImage.src = 'bullet.png';
+
+        // 获取音效元素
+        const backgroundMusic = document.getElementById('backgroundMusic');
+        const shootSound = document.getElementById('shootSound');
+        const explosionSound = document.getElementById('explosionSound');
+
+        class GameObject {
+            constructor(x, y, width, height, speed) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.speed = speed;
+            }
+            draw(ctx) {}
+            update() {}
+        }
+
+        class Plane extends GameObject {
+            draw(ctx) {
+                ctx.drawImage(planeImage, this.x, this.y, this.width, this.height);
+            }
+            move(x) {
+                this.x = x - this.width / 2; // 设置飞机位置为触摸位置的中心
+                if (this.x < 0) this.x = 0; // 防止飞机超出左边界
+                if (this.x > canvas.width - this.width) this.x = canvas.width - this.width; // 防止飞机超出右边界
+            }
+        }
+
+        class Bullet extends GameObject {
+            update() {
+                this.y -= this.speed;
+            }
+            draw(ctx) {
+                ctx.drawImage(bulletImage, this.x, this.y, this.width, this.height);
+            }
+        }
+
+        class Enemy extends GameObject {
+            update() {
+                this.y += this.speed;
+            }
+            draw(ctx) {
+                ctx.drawImage(enemyImage, this.x, this.y, this.width, this.height);
+            }
+        }
+
+        let plane = new Plane(canvas.width / 2 - 25, canvas.height - 100, 50, 50, 5);
+        let bullets = [];
+        let enemies = [];
+
+        function drawBackground() {
+            ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+        }
+
+        function drawPlane() {
+            plane.draw(ctx);
+        }
+
+        function drawBullets() {
+            bullets.forEach(bullet => {
+                bullet.update();
+                bullet.draw(ctx);
+            });
+        }
+
+        function drawEnemies() {
+            enemies.forEach(enemy => {
+                enemy.update();
+                enemy.draw(ctx);
+            });
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function spawnEnemy() {
+            enemies.push(new Enemy(Math.random() * (canvas.width - 60), -60, 60, 60, enemySpeed));
+        }
+
+        function shootBullet() {
+            bullets.push(new Bullet(plane.x + plane.width / 2 - 7.5, plane.y, 15, 30, 7)); // 将宽度改为 15，高度改为 30
+            shootSound.play(); // 播放射击音效
+        }
+
+        function checkCollisions() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    if (bullets[i].x < enemies[j].x + enemies[j].width &&
+                        bullets[i].x + bullets[i].width > enemies[j].x &&
+                        bullets[i].y < enemies[j].y + enemies[j].height &&
+                        bullets[i].y + bullets[i].height > enemies[j].y) {
+                        bullets.splice(i, 1); // 删除子弹
+                        enemies.splice(j, 1); // 删除敌机
+                        score++; // 增加得分
+                        scoreBoard.textContent = '得分: ' + score + '/' + maxScore; // 更新得分板
+                        explosionSound.play(); // 播放爆炸音效
+                        return;
+                    }
+                }
+            }
+        }
+
+        function checkGameOver() {
+            for (let enemy of enemies) {
+                if (enemy.y + enemy.height >= canvas.height) {
+                    gameRunning = false; // 结束游戏
+                    gameOverlay.style.display = 'flex'; // 显示游戏结束界面
+                    restartButton.style.display = 'block'; // 显示重新开始按钮
+                    return;
+                }
+            }
+        }
+
+        function checkWin() {
+            if (score >= maxScore) {
+                gameRunning = false; // 停止游戏
+                winOverlay.style.display = 'flex'; // 显示过关界面
+                continueButton.style.display = 'block'; // 显示 "好的" 按钮
+                confirmButton.style.display = 'block'; // 显示 "确定" 按钮
+                return true;
+            }
+            return false;
+        }
+
+        function drawScore() {
+            scoreBoard.textContent = '得分: ' + score + '/' + maxScore; // 更新得分
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return; // 如果游戏未运行，退出循环
+            clearCanvas();
+            drawBackground();
+            drawPlane();
+            drawBullets();
+            drawEnemies();
+            checkCollisions();
+            if (!checkWin()) {
+                checkGameOver();
+            }
+            drawScore();
+            requestAnimationFrame(gameLoop); // 继续下一帧
+        }
+
+        // 触摸事件
+        let isTouching = false;
+
+        canvas.addEventListener('touchstart', (e) => {
+            isTouching = true;
+            const touchX = e.touches[0].clientX; // 获取触摸的 X 坐标
+            plane.move(touchX); // 移动飞机
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (isTouching) {
+                const touchX = e.touches[0].clientX; // 获取触摸的 X 坐标
+                plane.move(touchX); // 移动飞机
+            }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            isTouching = false; // 结束触摸
+        });
+
+        // 自动射击
+        setInterval(() => {
+            if (gameRunning) shootBullet();
+        }, 500);
+
+        // 定时生成敌机
+        setInterval(() => {
+            if (gameRunning) spawnEnemy();
+        }, enemySpawnInterval);
+
+        // 重新开始按钮点击事件
+        restartButton.addEventListener('click', () => {
+            window.location.reload(); // 刷新页面重新开始
+        });
+
+        // "好的" 按钮点击事件，跳转到音频文件
+        continueButton.addEventListener('click', () => {
+            window.location.href = 'reward.mp4'; // 跳转至音频文件
+        });
+
+        // "确定" 按钮点击事件，跳转到音频文件
+        confirmButton.addEventListener('click', () => {
+            window.location.href = 'reward.mp4'; // 跳转至音频文件
+        });
+
+        gameLoop(); // 开始游戏主循环
+    </script>
+</body>
+</html>
