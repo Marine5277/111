@@ -121,7 +121,7 @@
         canvas.height = window.innerHeight;
 
         let score = 0; // 初始化分数
-        const maxScore = 20; // 过关的最大分数
+        const maxScore = 52; // 过关的最大分数
         let gameRunning = true; // 游戏状态
         let enemySpeed = 2; // 敌机速度
         let enemySpawnInterval = 1500; // 敌机生成间隔
@@ -311,7 +311,7 @@
         // 自动射击
         setInterval(() => {
             if (gameRunning) shootBullet();
-        }, 500);
+        }, 1500);
 
         // 定时生成敌机
         setInterval(() => {
